@@ -1,79 +1,87 @@
 package com.maquinadebusca.app.model.service;
 
-import java.net.URL;
+import com.maquinadebusca.app.model.Documento;
+import com.maquinadebusca.app.model.Link;
+
 import java.util.LinkedList;
 import java.util.List;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import com.maquinadebusca.app.model.repository.DocumentoRepository;
+import com.maquinadebusca.app.model.repository.LinkRepository;
 
-import com.maquinadebusca.app.model.Documento;
-
+@Service
 public class ColetorService {
-	
-	public List<Documento> iniciar() {
-	   List<String> urls_sementes = new LinkedList ();
-	   List<Documento> documentos = new LinkedList ();
-	   urls_sementes.add("https://www.oracle.com/index.html");
-	   urls_sementes.add ("https://www.youtube.com/");
-	   urls_sementes.add ("https://twitter.com/home?lang=pt");
-	   urls_sementes.add ("https://pt-br.facebook.com/");
-	   
-	   for (String url_str : urls_sementes)
-		   documentos.add(this.coletar(url_str));
-	   return documentos;
-	}	
-	
-	public Documento coletar (String url_str) {
-		URL url;
-		//Cria um documento
-		Documento d = new Documento();
-		try {
-			//Cria uma nova URL
-			url = new URL(url_str);
-			//Faz o download da url criada
-			Document doc = Jsoup.connect(url.toString()).get();
-			//recuperar as partes do documento que possui a tag a[href]
-			Elements links = doc.select("a[href]");
-			//Atribui valor para os atributos do obj criado
-			d.setUrl(url);
-			d.setTexto(doc.html());
-			d.setVisao(doc.text());
-			//Criar uma nova lista de urls 
-			List<String> urls = new LinkedList();
-			//Faz um loop na lista de links 
-			for (Element link : links)
-				//Valida o atributos href da tag html <a> não está vazia ou nula 
-				if ((!link.attr("abs:href").equals("") && (link.attr("abs:href") != null)))
-					//caso o atributo estiver preenchido adiciona na list de urls
-					urls.add(link.attr("abs:href"));
-			//Atribui a lista de urls para a lista de urls do meu obj
-			d.setUrls(urls);
+	@Autowired
+	private DocumentoRepository dr;
+	@Autowired
+	private LinkRepository lr;
 
-			System.out.println("\n\n\n=================================================");
-			System.out.println(">>> URL:");
-			System.out.println("=================================================");
-			System.out.println(d.getUrl());
-			System.out.println("\n\n\n=================================================");
-			System.out.println(">>> Página:");
-			System.out.println("=================================================");
-			System.out.println(d.getTexto());
-			System.out.println("\n\n\n=================================================");
-			System.out.println(">>> Visão:");
-			System.out.println("=================================================");
-			System.out.println(d.getVisao());
-			System.out.println("\n\n\n=================================================");
-			System.out.println(">>> URLs:");
-			System.out.println("=================================================");
-			urls = d.getUrls();
-			for (String u : urls)
-				System.out.println(u);
+	public List<Documento> executar() {
+		List<Documento> documentos = new LinkedList<>();
+		List<String> sementes = new LinkedList<>();
+		try {
+			sementes.add("https://www.youtube.com/");
+			sementes.add("https://www.facebook.com/");
+			sementes.add("https://www.twitter.com/");
+			for (String url : sementes) {
+				documentos.add(this.coletar(url));
+			}
+		} catch (Exception e) {
+			System.out.println("Erro ao executar o serviço de coleta!");
+			e.printStackTrace();
+		}
+		return documentos;
+	}
+
+	public Documento coletar(String urlDocumento) {
+		Documento documento = new Documento();
+		try {
+			Document d = Jsoup.connect(urlDocumento).get();
+			Elements urls = d.select("a[href]");
+			documento.setUrl(urlDocumento);
+			documento.setTexto(d.html());
+			documento.setVisao(d.text());
+			for (Element url : urls) {
+				String u = url.attr("abs:href");
+				// valida o conteudo da url (não esta vazio ou "")
+				if ((!u.equals("")) && (u != null)) {
+					Link link = new Link();
+					link.setUrl(u);
+					lr.save(link);
+				}
+			}
 		} catch (Exception e) {
 			System.out.println("Erro ao coletar a página.");
 			e.printStackTrace();
 		}
-		return d;
+		documento = dr.save(documento);
+		return documento;
+	}
+
+	public List<Documento> getDocumentos() {
+		Iterable<Documento> documentos = dr.findAll();
+		List<Documento> resposta = new LinkedList<>();
+		for (Documento documento : documentos) {
+			resposta.add(documento);
+		}
+		return resposta;
+	}
+
+	public Documento getDocumento(long id) {
+		return dr.findById(id);
+
+	}
+
+	public List<Link> getLinks() {	
+		return lr.findAll();
+	}
+
+	public Link getLink(long id) {
+		return lr.findById(id);
 	}
 }
